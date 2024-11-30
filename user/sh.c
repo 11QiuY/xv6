@@ -58,17 +58,14 @@ struct cmd *parsecmd(char*);
 void runcmd(struct cmd*) __attribute__((noreturn));
 void autocomplete(char *buf, int * i);
 
-int
-isatty (int fd)
-{
-  struct stat st;
-  if (fstat(fd, &st) < 0) {
-      printf("Error calling fstat\n");
-      exit(1);
-  }
-  // 1 == CONSOLE
-  return st.type == T_DEVICE && st.dev == 1;
+void writeToSTDIN(char * buf){
+  char bufx[128];
+  strcpy(bufx , "\t\t");
+  strcpy(bufx+2 , buf);
+  write(1, bufx , strlen(bufx));
 }
+
+
 
 // Execute cmd.  Never returns.
 void
@@ -150,9 +147,7 @@ runcmd(struct cmd *cmd)
 int
 getcmd(char *buf, int nbuf)
 {
-  if(isatty(0)){
   write(2, "$ ", 2);
-  }
   memset(buf, 0, nbuf);
   // gets(buf, nbuf);
   int i, cc;
@@ -547,6 +542,10 @@ void getpath(char * in , char * out , int n){
     }
 
 }
+void writetofront(char * buf){
+    printf("\r$ ");
+    writeToSTDIN(buf);
+}
 
 void autocomplete(char * buf , int * index){
   buf[*index] = '\0';
@@ -603,17 +602,24 @@ void autocomplete(char * buf , int * index){
 
   if(nr == 1){
     //只有一个匹配项，直接补全
-    char bufx[128];
-    strcpy(bufx , "\t\t");
-    strcpy(bufx+2 , names[0] + strlen(prefix));
-    write(1, bufx , strlen(bufx));
+    char newbuf[128] ;
+    strcpy(newbuf , buf);
+    strcpy(newbuf + strlen(buf) , names[0] + strlen(prefix));
+    writetofront(newbuf);
+    strcpy(buf , newbuf);
+    *index = 0;
   }else if(nr > 1){
     //有多个匹配项，打印出来
     printf("\n$ ");
     for(int i = 0 ; i < nr ; i++){
       printf("%s   " , names[i]);
     }
-    printf("\n$ %s" , buf);
+    printf("\n$ ");
+    writeToSTDIN(buf);
+    *index = 0;
+  } else if (nr == 0){
+    writetofront(buf);
+    *index = 0;
   }
   close(fd);
   return ;  
