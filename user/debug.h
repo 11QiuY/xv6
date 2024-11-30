@@ -1,6 +1,6 @@
 #include <assert.h>
 #include <stdarg.h>
-#define DEBUG
+// #define DEBUG
 #ifdef DEBUG
 
 #define LOG(fmt, ...)                                                          \
@@ -17,9 +17,7 @@
 
 #ifndef DEBUG
 #define LOG(fmt, ...)                                                          \
-  { 1 == 1; }
 
 #define ASSERT(cond, fmt, ...)                                                 \
-  { 1 == 1; }
 
 #endif

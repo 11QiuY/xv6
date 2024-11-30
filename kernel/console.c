@@ -25,6 +25,7 @@
 #define BACKSPACE 0x100
 #define C(x)  ((x)-'@')  // Control-x
 
+
 //
 // send one character to the uart.
 // called by printf(), and to echo input characters,
@@ -59,12 +60,27 @@ int
 consolewrite(int user_src, uint64 src, int n)
 {
   int i;
-
+  int en = 0;
+  int tabcomplete = 0;
   for(i = 0; i < n; i++){
     char c;
     if(either_copyin(&c, user_src, src+i, 1) == -1)
       break;
+    if(i == 0 && c == '\t'){
+      tabcomplete = 1;
+      continue;
+    }
+    if(tabcomplete){
+      if(c == '\t'){
+        en = 1;
+        continue;
+      }
+      if(en) consputc(c);
+      cons.buf[cons.e++ % INPUT_BUF_SIZE] = c;
+    }else{
     uartputc(c);
+    }
+
   }
 
   return i;
@@ -154,6 +170,11 @@ consoleintr(int c)
       cons.e--;
       consputc(BACKSPACE);
     }
+    break;
+  case '\t':
+    cons.buf[cons.e++ % INPUT_BUF_SIZE] = c;
+    cons.w = cons.e;
+    wakeup(&cons.r);
     break;
   default:
     if(c != 0 && cons.e-cons.r < INPUT_BUF_SIZE){

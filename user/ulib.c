@@ -24,12 +24,63 @@ strcpy(char *s, const char *t)
     ;
   return os;
 }
+int
+strncpy(char *s, const char *t, int n)
+{
+  char *os;
+
+  os = s;
+  while(n-- > 0 && (*s++ = *t++) != 0)
+    ;
+  while(n-- > 0)
+    *s++ = 0;
+  return s-os;
+}
+
+char * strcat(char * dest, const char * src){
+  char * d = dest;
+  while(*d){
+    d++;
+  }
+  while(*src){
+    *d = *src;
+    d++;
+    src++;
+  }
+  *d = 0;
+  return dest;
+}
+
+int mstrncat(char * dest, const char * src, int n){
+  char * d = dest;
+  while(*d){
+    d++;
+  }
+  while(*src && n > 0){
+    *d = *src;
+    d++;
+    src++;
+    n--;
+  }
+  *d = 0;
+  return dest - d;
+}
 
 int
 strcmp(const char *p, const char *q)
 {
   while(*p && *p == *q)
     p++, q++;
+  return (uchar)*p - (uchar)*q;
+}
+
+int 
+strncmp(const char *p, const char *q, uint n)
+{
+  while(n > 0 && *p && *p == *q)
+    n--, p++, q++;
+  if(n == 0)
+    return 0;
   return (uchar)*p - (uchar)*q;
 }
 
@@ -63,6 +114,22 @@ strchr(const char *s, char c)
   return 0;
 }
 
+char * mstrrchr(const char *s, char c){
+  const char * last = 0;
+  for(; *s; s++)
+    if(*s == c)
+      last = s;
+  return (char*)last;
+}
+
+char * mstrrnchr(const char *s, char c, int n){
+  const char * last = 0;
+  for(; *s && n > 0; s++, n--)
+    if(*s == c)
+      last = s;
+  return (char*)last;
+}
+
 char*
 gets(char *buf, int max)
 {
@@ -79,6 +146,12 @@ gets(char *buf, int max)
   }
   buf[i] = '\0';
   return buf;
+}
+
+char getchar(void){
+  char c;
+  read(0, &c, 1);
+  return c;
 }
 
 int
@@ -145,3 +218,4 @@ memcpy(void *dst, const void *src, uint n)
 {
   return memmove(dst, src, n);
 }
+

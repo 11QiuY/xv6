@@ -7,7 +7,7 @@
 volatile static int started = 0;
 
 // start() jumps here in supervisor mode on all CPUs.
-void
+int
 main()
 {
   if(cpuid() == 0){
@@ -41,5 +41,6 @@ main()
     plicinithart();   // ask PLIC for device interrupts
   }
 
-  scheduler();        
+  scheduler();   
+  return 0;     
 }
