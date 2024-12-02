@@ -60,8 +60,8 @@ void autocomplete(char *buf, int * i);
 
 void writeToSTDIN(char * buf){
   char bufx[128];
-  strcpy(bufx , "\t\t");
-  strcpy(bufx+2 , buf);
+  strcpy(bufx , "\t");
+  strcpy(bufx+1 , buf);
   write(1, bufx , strlen(bufx));
 }
 
@@ -144,10 +144,38 @@ runcmd(struct cmd *cmd)
   exit(0);
 }
 
+int isatty(int fd){
+  struct stat st;
+  if (fstat(fd, &st) < 0) {
+    panic("Error to stat");
+  }
+  return st.type == T_DEVICE && st.dev == 1;
+}
+
+
+#define HISTORY_MAX  21
+static char history[HISTORY_MAX][100];
+static int hst;
+static int hend;
+static int hpos;
+
+void add_history(const char * cmd){
+  int size = hend - hst;
+  strcpy(history[hend] , cmd);
+  history[hend][strlen(cmd) - 1] = '\0'; 
+  hend = (hend + 1) % HISTORY_MAX;
+  hpos = hend;
+  if(size == -1){
+    hst = (hst + 1) % HISTORY_MAX;
+  }
+}
+
 int
 getcmd(char *buf, int nbuf)
 {
-  write(2, "$ ", 2);
+  if(isatty(0)){
+    write(2, "$ ", 2);
+  }
   memset(buf, 0, nbuf);
   // gets(buf, nbuf);
   int i, cc;
@@ -158,15 +186,40 @@ getcmd(char *buf, int nbuf)
     if(cc < 1)
       break;
     if(i != 0 && c == '\t' && (buf[i-1] != '\t' )){
-      // printf("got a tab\n");
       autocomplete(buf , &i);
-      // printf("i = %d\n" , i);
       LOG("buf = %s" , buf);
       continue;
-    }
+    }else if(c == '\e'){
+      char a , b;
+      read(0 , &a , 1);
+      read(0 , &b , 1);
+      if(a != '[')
+        continue;
+      if(b == 'A'){
+        // up
+        if(hpos == hst){
+          continue;
+        }
+        hpos = (hpos - 1 + HISTORY_MAX) % HISTORY_MAX;
+        strcpy(buf , history[hpos]);
+        writeToSTDIN(buf);
+        i = 0;
+        continue;
+      }else if (b == 'B'){
+        if(hpos == hend){
+          continue;
+        }
+        hpos = (hpos + 1) % HISTORY_MAX;
+        strcpy(buf , history[hpos]);
+        writeToSTDIN(buf);
+        i = 0;
+        continue;
+      }
+    } else{
     buf[i++] = c;
     if(c == '\n' || c == '\r')
       break;
+    }
   }
   buf[i] = '\0';
   if(buf[0] == 0) // EOF
@@ -190,6 +243,7 @@ main(void)
 
   // Read and run input commands.
   while(getcmd(buf, sizeof(buf)) >= 0){
+    if(strlen(buf) > 1)  add_history(buf);
     if(buf[0] == 'c' && buf[1] == 'd' && buf[2] == ' '){
       // Chdir must be called by the parent, not the child.
       buf[strlen(buf)-1] = 0;  // chop \n
@@ -197,6 +251,7 @@ main(void)
         fprintf(2, "cannot cd %s\n", buf+3);
       continue;
     }
+
     if(fork1() == 0)
       runcmd(parsecmd(buf));
     wait(0);

@@ -25,6 +25,12 @@
 #define BACKSPACE 0x100
 #define C(x)  ((x)-'@')  // Control-x
 
+enum {
+  NORMAL = 0,
+  ESCAPE = 1,
+  LBRACKET = 2,
+} state = NORMAL;
+
 
 //
 // send one character to the uart.
@@ -60,7 +66,6 @@ int
 consolewrite(int user_src, uint64 src, int n)
 {
   int i;
-  int en = 0;
   int tabcomplete = 0;
   for(i = 0; i < n; i++){
     char c;
@@ -71,11 +76,7 @@ consolewrite(int user_src, uint64 src, int n)
       continue;
     }
     if(tabcomplete){
-      if(c == '\t'){
-        en = 1;
-        continue;
-      }
-      if(en) consputc(c);
+      consputc(c);
       cons.buf[cons.e++ % INPUT_BUF_SIZE] = c;
     }else{
     uartputc(c);
@@ -148,11 +149,8 @@ consoleread(int user_dst, uint64 dst, int n)
 // do erase/kill processing, append to cons.buf,
 // wake up consoleread() if a whole line has arrived.
 //
-void
-consoleintr(int c)
-{
-  acquire(&cons.lock);
 
+void normal_intr(int c){ //处理普通字符的中断
   switch(c){
   case C('P'):  // Print process list.
     procdump();
@@ -195,7 +193,54 @@ consoleintr(int c)
     }
     break;
   }
-  
+
+}
+
+void escape_intr(int c){ //处理 \e[ 类型的终端，需要引入状态机
+  switch (c) {
+    case 'A': // 上
+    case 'B': // 下
+      // 清空缓存区
+      while(cons.e != cons.w){
+        cons.e --;
+        consputc(BACKSPACE);
+      }
+      // 把上下键返回给用户终端
+    cons.buf[cons.e++ % INPUT_BUF_SIZE] = '\e';
+    cons.buf[cons.e++ % INPUT_BUF_SIZE] = '[';
+    cons.buf[cons.e++ % INPUT_BUF_SIZE] = c;
+    cons.w = cons.e;
+    wakeup(&cons.r); 
+  }
+
+}
+
+
+void
+consoleintr(int c)
+{
+  acquire(&cons.lock);
+
+  switch (state) {
+      case NORMAL:
+        if(c == '\e'){
+          state = ESCAPE;
+        } else{
+          normal_intr(c);
+        }
+        break;
+      case ESCAPE:
+        if(c == '['){
+          state = LBRACKET;
+        } else{
+          state = NORMAL;
+        }
+        break;
+      case LBRACKET:
+        escape_intr(c);
+        state = NORMAL;
+        break;
+  }
   release(&cons.lock);
 }
 
