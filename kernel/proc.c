@@ -20,6 +20,8 @@ static void freeproc(struct proc *p);
 
 extern char trampoline[]; // trampoline.S
 
+extern struct usyscall *usys;
+
 // helps ensure that wakeups of wait()ing
 // parents are not lost. helps obey the
 // memory model when using p->parent.
@@ -202,6 +204,16 @@ proc_pagetable(struct proc *p)
     return 0;
   }
 
+  // map the usys page just below the trapframe page
+  if(mappages(pagetable, USYSCALL, PGSIZE,
+              (uint64)usys, PTE_R | PTE_U  ) < 0){
+    uvmunmap(pagetable, TRAMPOLINE, 1, 0);
+    uvmunmap(pagetable, TRAPFRAME, 1, 0);
+    uvmfree(pagetable, 0);
+    return 0;
+  }
+
+
   return pagetable;
 }
 
@@ -212,6 +224,7 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 {
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, TRAPFRAME, 1, 0);
+  uvmunmap(pagetable, USYSCALL, 1, 0);
   uvmfree(pagetable, sz);
 }
 
@@ -463,6 +476,12 @@ scheduler(void)
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
+
+          struct usyscall sys = {
+           p->pid
+          };
+        *usys = sys;
+
         swtch(&c->context, &p->context);
 
         // Process is done running for now.
@@ -501,6 +520,12 @@ sched(void)
     panic("sched running");
   if(intr_get())
     panic("sched interruptible");
+
+
+  struct usyscall sys = {
+    p->pid
+  };
+  *usys = sys;
 
   intena = mycpu()->intena;
   swtch(&p->context, &mycpu()->context);

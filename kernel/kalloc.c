@@ -80,3 +80,53 @@ kalloc(void)
     memset((char*)r, 5, PGSIZE); // fill with junk
   return (void*)r;
 }
+
+void *
+superalloc(void)
+{
+  struct run *r;
+  struct run *va;
+
+  acquire(&kmem.lock);
+
+  va = kmem.freelist;
+  r = kmem.freelist;
+  // alloc 2M pages
+  for(int i = 0 ; i < SUPERPGSIZE / PGSIZE - 1 ; i++){
+    if(r == 0){
+      release(&kmem.lock);
+      return 0;
+    }
+    r = r->next;
+  }
+  kmem.freelist = r->next;
+
+  release(&kmem.lock);
+
+  if(va)
+    memset((char*)va, 5, SUPERPGSIZE); // fill with junk
+  return (void*)va;
+}
+
+void superfree(void * pa)
+{
+  struct run *r;
+
+  if(((uint64)pa % SUPERPGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
+    panic("superfree");
+
+  // Fill with junk to catch dangling refs.
+  memset(pa, 1, SUPERPGSIZE);
+
+  r = (struct run*)pa;
+
+  acquire(&kmem.lock);
+  for(int i = 0 ; i < SUPERPGSIZE / PGSIZE - 1 ; i++){
+    r = r->next;
+  }
+  r->next = kmem.freelist;
+  kmem.freelist = (struct run*)pa;
+  release(&kmem.lock);
+}
+
+

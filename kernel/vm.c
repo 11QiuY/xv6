@@ -17,6 +17,8 @@ extern char etext[];  // kernel.ld sets this to end of kernel code.
 
 extern char trampoline[]; // trampoline.S
 
+struct usyscall * usys;
+
 // Make a direct-map page table for the kernel.
 pagetable_t
 kvmmake(void)
@@ -52,6 +54,11 @@ kvmmake(void)
   // map the trampoline for trap entry/exit to
   // the highest virtual address in the kernel.
   kvmmap(kpgtbl, TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
+
+  // map syscall page
+  usys = (struct usyscall *)kalloc();
+  printf("the pa of usys = %p\n", usys);
+  kvmmap(kpgtbl , USYSCALL,(uint64)usys,PGSIZE,PTE_R | PTE_W);
 
   // allocate and map a kernel stack for each process.
   proc_mapstacks(kpgtbl);
@@ -259,7 +266,7 @@ uvmalloc(pagetable_t pagetable, uint64 oldsz, uint64 newsz, int xperm)
 
   if(newsz < oldsz)
     return oldsz;
-
+    
   oldsz = PGROUNDUP(oldsz);
   for(a = oldsz; a < newsz; a += sz){
     sz = PGSIZE;
@@ -488,9 +495,33 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
 
 
 #ifdef LAB_PGTBL
+
+void
+tbprint(pagetable_t pagetable , int depth , int pre_va){
+  for(int i = 0 ; i < 512 ; i++){
+    uint64 pte = pagetable[i];
+    if(pte & PTE_V){
+      for(int j = 0 ; j < depth ; j++){
+        printf(" ..");
+      }
+      // calulate the va
+      uint64 va = i << PXSHIFT(3-depth) | pre_va;
+      uint64 pa = PTE2PA(pte);
+      printf("%p: %p %p\n", (void *)va , (void*)pte , (void*)pa);
+      
+       
+      if(!PTE_LEAF(pte)){
+        tbprint((pagetable_t)PTE2PA(pte), depth + 1 , va);
+      }
+    }
+  }
+}
+
 void
 vmprint(pagetable_t pagetable) {
   // your code here
+  printf("page table %p\n", pagetable);
+  tbprint(pagetable, 1 , 0);
 }
 #endif
 

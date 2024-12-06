@@ -68,8 +68,10 @@ ugetpid_test()
         exit(1);
       continue;
     }
-    if (getpid() != ugetpid())
-      err("missmatched PID");
+    if (getpid() != ugetpid()){
+      printf("ugetpid_test: getpid() %d != ugetpid() %d\n", getpid(), ugetpid());
+      exit(1);
+    }
     exit(0);
   }
   printf("ugetpid_test: OK\n");
