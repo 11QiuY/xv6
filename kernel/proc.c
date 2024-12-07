@@ -272,12 +272,32 @@ userinit(void)
 int
 growproc(int n)
 {
+  // printf("growproc: n=%d\n", n);
   uint64 sz;
   struct proc *p = myproc();
 
   sz = p->sz;
+  uint64 oldsz = sz;
+  uint64 newsz = SUPERPGROUNDUP(sz);
+  int spnum = n/SUPERPGSIZE;
   if(n > 0){
-    if((sz = uvmalloc(p->pagetable, sz, sz + n, PTE_W)) == 0) {
+    if(spnum > 0 && spnum < 8){
+      //填充间隙
+      if(newsz > sz){
+        if((sz = uvmalloc(p->pagetable , sz , newsz,PTE_W)) == 0){
+          return -1;
+        }
+      }
+      p->sz = sz;
+      // 分配巨页
+      if((sz = superuvmalloc(p->pagetable , sz  , sz + spnum * SUPERPGSIZE ,PTE_W)) == 0){
+        return -1;
+      }
+      p->sz = sz;
+    }else
+     // 如果没分配巨页，正常分配普通页
+     // 如果分配过了巨页，sz指向最后一个对齐的巨页顶，这里还需要分配额外的填充页
+    if((sz = uvmalloc(p->pagetable, sz, oldsz + n ,PTE_W)) == 0){
       return -1;
     }
   } else if(n < 0){
