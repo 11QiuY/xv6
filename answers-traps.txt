@@ -1,0 +1,6 @@
+1.a0 - a7 , a2 holds 13 in main's call to printf
+2.the call of f and g is optimized by the compiler
+3.6e2
+4.3c(the next address of current pc)
+5.skip...
+6.the number of register a2 which is Unknown

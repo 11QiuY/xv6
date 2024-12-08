@@ -77,8 +77,21 @@ usertrap(void)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
+  if(which_dev == 2){
+    p->last_alarm ++;
+    if(p->in_alarm_handler){
+      p->last_alarm = 0;
+    } else if(p->last_alarm == p->alarm_interval){
+      // 保存当前的trapframe
+      p->tf = *p->trapframe;
+      // 因为要执行用户态的函数，必须通过trap让程序在用户态下执行
+      p->trapframe->epc = (uint64)p->sig_alarmsignal;
+      p->last_alarm = 0;
+      p->in_alarm_handler = 1;
+      usertrapret();
+    }
     yield();
+  }
 
   usertrapret();
 }

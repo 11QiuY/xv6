@@ -54,6 +54,8 @@ sys_sleep(void)
   int n;
   uint ticks0;
 
+  backtrace();
+
   argint(0, &n);
   if(n < 0)
     n = 0;
@@ -91,3 +93,30 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+uint64
+sys_sigalarm(void){
+int n;
+uint64 handler;
+
+argint(0, &n);
+argaddr(1, &handler);
+
+// printf("enter sys_sigalarm with args %d %p\n", n, (void*)handler);
+struct proc *p = myproc();
+p->alarm_interval = n;
+p->sig_alarmsignal = (void (*)(void))handler;
+
+return 0;
+}
+
+uint64
+sys_sigreturn(void){
+// 用户态函数执行完后，恢复之前程序中断时的上下文
+struct proc *p = myproc();
+*p->trapframe = p->tf;
+p->in_alarm_handler = 0;
+usertrapret();
+return 0;
+}
+
