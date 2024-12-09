@@ -67,12 +67,57 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
+  } else if(r_scause() == 0xf) // store page fault
+  {
+    uint64 va = r_stval();
+    pagetable_t pt = p->pagetable;
+    if(va >= MAXVA){
+      printf("usertrap(): va=%p\n", (void *)va);
+      printf("            sepc=%p\n", (void*)r_sepc());
+      setkilled(p);
+      goto exit;
+    }
+    pte_t *pte = walk(pt, va, 0);
+    if(!pte){
+      printf("usertrap(): pte is null\n");
+      printf("            va=%p\n", (void *)va);
+      printf("            sepc=%p\n", (void*)r_sepc());
+      setkilled(p);
+      goto exit;
+    }
+    if(*pte & PTE_COW && *pte & PTE_U && *pte & PTE_V){ // copy on write
+
+      *pte &= ~PTE_COW; // change to not cow
+      *pte |= PTE_W; // change to writable
+
+      uint64 pa = PTE2PA(*pte);
+
+      int flags = PTE_FLAGS(*pte);
+      
+      char *mem = kalloc();
+      if(mem == 0){
+        printf("usertrap(): out of memory\n");
+        setkilled(p);
+        return;
+      }
+      
+      memmove(mem, (char*)pa, PGSIZE);
+      *pte = PA2PTE((uint64)mem) | flags;
+      kfree((void*)pa);
+      sfence_vma();
+    }
+    else{
+      printf("usertrap(): unexpected scause 0x%lx pid=%d\n", r_scause(), p->pid);
+      printf("            sepc=0x%lx stval=0x%lx\n", r_sepc(), r_stval());
+      setkilled(p);
+    }
   } else {
     printf("usertrap(): unexpected scause 0x%lx pid=%d\n", r_scause(), p->pid);
     printf("            sepc=0x%lx stval=0x%lx\n", r_sepc(), r_stval());
     setkilled(p);
   }
 
+  exit:
   if(killed(p))
     exit(-1);
 
