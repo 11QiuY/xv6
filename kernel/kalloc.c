@@ -23,18 +23,32 @@ struct {
   struct run *freelist;
 } kmem;
 
+int * refcount;
+int pages;
+
+uint64 get_index(void *pa)
+{
+  return (uint64)(pa - (void *)end) / PGSIZE;
+}
+
 void
 kinit()
 {
   initlock(&kmem.lock, "kmem");
+  int refcount_size = (PHYSTOP - (uint64)end) / (PGSIZE / sizeof(int) + 1);
+  pages = refcount_size / PGSIZE + 1;
   freerange(end, (void*)PHYSTOP);
 }
 
 void
-freerange(void *pa_start, void *pa_end)
+freerange(void *pa_start, void *pa_end )
 {
   char *p;
   p = (char*)PGROUNDUP((uint64)pa_start);
+  // allocate refcount pages
+  refcount = (int*)p;
+  p += (pages) * PGSIZE;
+  memset(refcount, 0, pages * PGSIZE);
   for(; p + PGSIZE <= (char*)pa_end; p += PGSIZE)
     kfree(p);
 }
@@ -46,11 +60,17 @@ freerange(void *pa_start, void *pa_end)
 void
 kfree(void *pa)
 {
+  int index = get_index(pa);
+  if(refcount[index] > 1){
+    refcount[index] -= 1;
+    return;
+  }
   struct run *r;
 
   if(((uint64)pa % PGSIZE) != 0 || (char*)pa < end || (uint64)pa >= PHYSTOP)
     panic("kfree");
 
+  refcount[index] = 0;
   // Fill with junk to catch dangling refs.
   memset(pa, 1, PGSIZE);
 
@@ -76,7 +96,18 @@ kalloc(void)
     kmem.freelist = r->next;
   release(&kmem.lock);
 
-  if(r)
+  if(r){
     memset((char*)r, 5, PGSIZE); // fill with junk
+    int index = get_index((void*)r);
+    refcount[index] = 1;
+  }
+
   return (void*)r;
+}
+
+void 
+add_ref(void *pa)
+{
+  int index = get_index(pa);
+  refcount[index] += 1;
 }
