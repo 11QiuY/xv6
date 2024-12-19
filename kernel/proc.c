@@ -449,7 +449,10 @@ void sched(void) {
   struct proc *p = myproc();
 
   if (!holding(&p->lock)) panic("sched p->lock");
-  if (mycpu()->noff != 1) panic("sched locks");
+  if (mycpu()->noff != 1) {
+    printf("mycpu()->noff: %d\n", mycpu()->noff);
+    panic("sched locks");
+  }
   if (p->state == RUNNING) panic("sched running");
   if (intr_get()) panic("sched interruptible");
 

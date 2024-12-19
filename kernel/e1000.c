@@ -96,7 +96,8 @@ int e1000_transmit(char *buf, int len) {
 
   // first read the tail of the ring
   acquire(&e1000_lock);
-  int tail = regs[E1000_TDT];
+  uint32 tail = regs[E1000_TDT];
+  tail = tail % TX_RING_SIZE;
   // check if the tail is overflowing
   if (tail < 0 || tail >= TX_RING_SIZE) panic("e1000_transmit");
   // check the status of the tail
@@ -106,10 +107,10 @@ int e1000_transmit(char *buf, int len) {
     // free the buffer
     if (tx_bufs[tail]) {
       kfree(tx_bufs[tail]);
-      tx_bufs[tail] = 0;
     }
   }
   // fill the descriptor
+  tx_bufs[tail] = buf;
   struct tx_desc *desc = &tx_ring[tail];
   desc->addr = (uint64)buf;
   desc->length = len;
