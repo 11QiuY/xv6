@@ -1,1 +1,32 @@
-DisableFormat: true
+BasedOnStyle : Google
+SortIncludes : Never
+
+# 对齐尾部注释
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 2
+# 对齐声明
+AlignConsecutiveBitFields:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: false
+  AlignFunctionPointers: true
+
+AlignConsecutiveDeclarations:
+  Enabled: true
+  AcrossEmptyLines: false
+  AcrossComments: false
+# 宏对齐
+AlignConsecutiveMacros:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: false
+# case 对齐
+AlignConsecutiveShortCaseStatements:
+  Enabled: true
+  AcrossEmptyLines: true
+  AcrossComments: true
+  AlignCaseColons: false
+# 反斜杠对齐
+AlignEscapedNewlines: Right
+AllowAllParametersOfDeclarationOnNextLine: true
